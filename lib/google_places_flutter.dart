@@ -149,13 +149,13 @@ class _GooglePlaceAutoCompleteTextFieldState
                   return InkWell(
                     onTap: () {
                       if (index < _allPredictions.length) {
-                        _sessionToken = Uuid().v4();
                         widget.itemClick!(_allPredictions[index]);
                         if (widget.isLatLngRequired) {
                           _getPlaceDetailsFromPlaceId(_allPredictions[index]);
                         }
 
                         _removeOverlay();
+                        _sessionToken = Uuid().v4();
                       }
                     },
                     child: Container(
@@ -180,8 +180,9 @@ class _GooglePlaceAutoCompleteTextFieldState
   }
 
   Future<void> _getLocation(String text) async {
-    String url = '$_baseUrl/autocomplete/json?input=$text'
-        '&radius=${widget.radius}&$_sessionToken&key=${widget.googleAPIKey}';
+    String url =
+        '$_baseUrl/autocomplete/json?input=$text&radius=${widget.radius}'
+        '&sessiontoken=$_sessionToken&key=${widget.googleAPIKey}';
 
     if (widget.countries != null) {
       for (int i = 0; i < widget.countries!.length; i++) {
@@ -217,7 +218,7 @@ class _GooglePlaceAutoCompleteTextFieldState
 
   Future<Response?> _getPlaceDetailsFromPlaceId(Prediction prediction) async {
     var url = '$_baseUrl/details/json?placeid=${prediction.placeId}'
-        '&key=${widget.googleAPIKey}';
+        '&sessiontoken=$_sessionToken&key=${widget.googleAPIKey}';
 
     Response response = await Dio().get(url);
 
