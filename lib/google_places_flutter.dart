@@ -40,6 +40,9 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
   /// [TextEditingController] for this TextFormField.
   final TextEditingController textEditingController;
 
+  /// Fine tune predictions results by defining search radius, default is 500.
+  final int radius;
+
   GooglePlaceAutoCompleteTextField({
     required this.textEditingController,
     required this.googleAPIKey,
@@ -50,6 +53,7 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
     this.textStyle: const TextStyle(),
     this.countries,
     this.getPlaceDetailWithLatLng,
+    this.radius = 500,
   });
 
   @override
@@ -95,7 +99,7 @@ class _GooglePlaceAutoCompleteTextFieldState
   Future<void> _getLocation(String text) async {
     Dio dio = Dio();
     String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?'
-        'input=$text&radius=500&=&$sessionToken&key=${widget.googleAPIKey}';
+        'input=$text&radius=${widget.radius}&$sessionToken&key=${widget.googleAPIKey}';
 
     if (widget.countries != null) {
       for (int i = 0; i < widget.countries!.length; i++) {

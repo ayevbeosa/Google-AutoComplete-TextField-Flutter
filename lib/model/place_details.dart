@@ -38,22 +38,23 @@ class Result {
   String? vicinity;
   String? website;
 
-  Result(
-      {this.addressComponents,
-      this.adrAddress,
-      this.formattedAddress,
-      this.geometry,
-      this.icon,
-      this.name,
-      this.photos,
-      this.placeId,
-      this.reference,
-      this.scope,
-      this.types,
-      this.url,
-      this.utcOffset,
-      this.vicinity,
-      this.website});
+  Result({
+    this.addressComponents,
+    this.adrAddress,
+    this.formattedAddress,
+    this.geometry,
+    this.icon,
+    this.name,
+    this.photos,
+    this.placeId,
+    this.reference,
+    this.scope,
+    this.types,
+    this.url,
+    this.utcOffset,
+    this.vicinity,
+    this.website,
+  });
 
   Result.fromJson(Map<String, dynamic> json) {
     if (json['address_components'] != null) {
@@ -70,7 +71,7 @@ class Result {
     icon = json['icon'];
     name = json['name'];
     if (json['photos'] != null) {
-      photos =[];
+      photos = [];
       json['photos'].forEach((v) {
         photos!.add(new Photos.fromJson(v));
       });
