@@ -1,6 +1,7 @@
 library google_places_flutter;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_places_flutter/model/place_details.dart';
 import 'package:google_places_flutter/model/prediction.dart';
@@ -22,6 +23,8 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
 
   /// Optional parameter that determines if a [Prediction]
   /// will contain `LatLng` coordinates.
+  ///
+  /// Defaults to `true`
   final bool isLatLngRequired;
 
   /// [TextStyle] of the input text.
@@ -31,7 +34,9 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
   /// (Ensure, Places API is enabled before using this key).
   final String googleAPIKey;
 
-  /// Minimum interval before successive predictions call (default is 600ms).
+  /// Minimum interval before successive predictions call.
+  ///
+  /// Default is 600ms.
   final int debounceTime;
 
   /// Limit predictions to desired countries.
@@ -40,7 +45,9 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
   /// [TextEditingController] for this TextFormField.
   final TextEditingController textEditingController;
 
-  /// Fine tune predictions results by defining search radius, default is 500.
+  /// Fine tune predictions results by defining search radius.
+  ///
+  /// Default is 500.
   final int radius;
 
   GooglePlaceAutoCompleteTextField({
@@ -71,7 +78,10 @@ class _GooglePlaceAutoCompleteTextFieldState
 
   /// Session token that generates at the beginning of every prediction search
   /// and regenerates when a prediction has been selected.
-  String sessionToken = Uuid().v4();
+  String _sessionToken = Uuid().v4();
+
+  static const String _baseUrl = 'https://maps.googleapis.com/maps/api/place';
+  final Dio _dio = Dio()..options.baseUrl = _baseUrl;
 
   @override
   void initState() {
@@ -79,6 +89,25 @@ class _GooglePlaceAutoCompleteTextFieldState
         .distinct()
         .debounceTime(Duration(milliseconds: widget.debounceTime))
         .listen(_getLocation);
+
+    if (kDebugMode) {
+      _dio.interceptors.add(
+        LogInterceptor(
+          responseBody: true,
+          error: true,
+          requestHeader: true,
+          responseHeader: true,
+          request: true,
+          requestBody: true,
+          logPrint: (text) {
+            final pattern = RegExp('.{1,800}');
+            pattern
+                .allMatches(text.toString())
+                .forEach((match) => debugPrint(match.group(0)));
+          },
+        ),
+      );
+    }
 
     super.initState();
   }
@@ -97,9 +126,8 @@ class _GooglePlaceAutoCompleteTextFieldState
   }
 
   Future<void> _getLocation(String text) async {
-    Dio dio = Dio();
-    String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?'
-        'input=$text&radius=${widget.radius}&$sessionToken&key=${widget.googleAPIKey}';
+    String url = '$_baseUrl/autocomplete/json?'
+        'input=$text&radius=${widget.radius}&$_sessionToken&key=${widget.googleAPIKey}';
 
     if (widget.countries != null) {
       for (int i = 0; i < widget.countries!.length; i++) {
@@ -113,7 +141,7 @@ class _GooglePlaceAutoCompleteTextFieldState
       }
     }
 
-    Response response = await dio.get(url);
+    Response response = await _dio.get(url);
     PlacesAutocompleteResponse subscriptionResponse =
         PlacesAutocompleteResponse.fromJson(response.data);
 
@@ -157,7 +185,7 @@ class _GooglePlaceAutoCompleteTextFieldState
                   return InkWell(
                     onTap: () {
                       if (index < _allPredictions.length) {
-                        sessionToken = Uuid().v4();
+                        _sessionToken = Uuid().v4();
                         widget.itemClick!(_allPredictions[index]);
                         if (widget.isLatLngRequired) {
                           _getPlaceDetailsFromPlaceId(_allPredictions[index]);
@@ -188,7 +216,7 @@ class _GooglePlaceAutoCompleteTextFieldState
   }
 
   Future<Response?> _getPlaceDetailsFromPlaceId(Prediction prediction) async {
-    var url = 'https://maps.googleapis.com/maps/api/place/details/json'
+    var url = '$_baseUrl/details/json'
         '?placeid=${prediction.placeId}&key=${widget.googleAPIKey}';
 
     Response response = await Dio().get(url);
