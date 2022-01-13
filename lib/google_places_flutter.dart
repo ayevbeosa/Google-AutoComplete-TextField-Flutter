@@ -125,42 +125,6 @@ class _GooglePlaceAutoCompleteTextFieldState
     );
   }
 
-  Future<void> _getLocation(String text) async {
-    String url = '$_baseUrl/autocomplete/json?'
-        'input=$text&radius=${widget.radius}&$_sessionToken&key=${widget.googleAPIKey}';
-
-    if (widget.countries != null) {
-      for (int i = 0; i < widget.countries!.length; i++) {
-        String country = widget.countries![i];
-
-        if (i == 0) {
-          url = url + '&components=country:$country';
-        } else {
-          url = url + '|' + 'country:' + country;
-        }
-      }
-    }
-
-    Response response = await _dio.get(url);
-    PlacesAutocompleteResponse subscriptionResponse =
-        PlacesAutocompleteResponse.fromJson(response.data);
-
-    if (text.length == 0) {
-      _allPredictions.clear();
-      this._overlayEntry!.remove();
-      return;
-    }
-
-    if (subscriptionResponse.predictions!.length > 0) {
-      _allPredictions.clear();
-      _allPredictions.addAll(subscriptionResponse.predictions!);
-    }
-
-    this._overlayEntry = null;
-    this._overlayEntry = this._createOverlayEntry();
-    Overlay.of(context)!.insert(this._overlayEntry!);
-  }
-
   OverlayEntry? _createOverlayEntry() {
     if (context.findRenderObject() != null) {
       RenderBox renderBox = context.findRenderObject() as RenderBox;
@@ -215,9 +179,45 @@ class _GooglePlaceAutoCompleteTextFieldState
     this._overlayEntry!.markNeedsBuild();
   }
 
+  Future<void> _getLocation(String text) async {
+    String url = '$_baseUrl/autocomplete/json?input=$text'
+        '&radius=${widget.radius}&$_sessionToken&key=${widget.googleAPIKey}';
+
+    if (widget.countries != null) {
+      for (int i = 0; i < widget.countries!.length; i++) {
+        String country = widget.countries![i];
+
+        if (i == 0) {
+          url = url + '&components=country:$country';
+        } else {
+          url = url + '|' + 'country:' + country;
+        }
+      }
+    }
+
+    Response response = await _dio.get(url);
+    PlacesAutocompleteResponse subscriptionResponse =
+    PlacesAutocompleteResponse.fromJson(response.data);
+
+    if (text.length == 0) {
+      _allPredictions.clear();
+      this._overlayEntry!.remove();
+      return;
+    }
+
+    if (subscriptionResponse.predictions!.length > 0) {
+      _allPredictions.clear();
+      _allPredictions.addAll(subscriptionResponse.predictions!);
+    }
+
+    this._overlayEntry = null;
+    this._overlayEntry = this._createOverlayEntry();
+    Overlay.of(context)!.insert(this._overlayEntry!);
+  }
+
   Future<Response?> _getPlaceDetailsFromPlaceId(Prediction prediction) async {
-    var url = '$_baseUrl/details/json'
-        '?placeid=${prediction.placeId}&key=${widget.googleAPIKey}';
+    var url = '$_baseUrl/details/json?placeid=${prediction.placeId}'
+        '&key=${widget.googleAPIKey}';
 
     Response response = await Dio().get(url);
 
