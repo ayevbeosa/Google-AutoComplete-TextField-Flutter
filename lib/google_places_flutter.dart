@@ -197,7 +197,7 @@ class _GooglePlaceAutoCompleteTextFieldState
 
     Response response = await _dio.get(url);
     PlacesAutocompleteResponse subscriptionResponse =
-    PlacesAutocompleteResponse.fromJson(response.data);
+        PlacesAutocompleteResponse.fromJson(response.data);
 
     if (text.length == 0) {
       _allPredictions.clear();
