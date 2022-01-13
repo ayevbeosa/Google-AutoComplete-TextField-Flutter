@@ -50,6 +50,15 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
   /// Default is 500.
   final int radius;
 
+  /// Latitude of the user's current location
+  final double? latitude;
+
+  /// Longitude of the user's current location
+  final double? longitude;
+
+  /// Optional parameter to determine finer search
+  final bool strict;
+
   GooglePlaceAutoCompleteTextField({
     required this.textEditingController,
     required this.googleAPIKey,
@@ -61,6 +70,9 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
     this.countries,
     this.getPlaceDetailWithLatLng,
     this.radius = 500,
+    this.latitude,
+    this.longitude,
+    this.strict = false,
   });
 
   @override
@@ -182,18 +194,30 @@ class _GooglePlaceAutoCompleteTextFieldState
   Future<void> _getLocation(String text) async {
     String url =
         '$_baseUrl/autocomplete/json?input=$text&radius=${widget.radius}'
-        '&sessiontoken=$_sessionToken&key=${widget.googleAPIKey}';
+        '&sessiontoken=$_sessionToken&strictbounds=${widget.strict}'
+        '&key=${widget.googleAPIKey}';
 
     if (widget.countries != null) {
       for (int i = 0; i < widget.countries!.length; i++) {
         String country = widget.countries![i];
 
         if (i == 0) {
-          url = url + '&components=country:$country';
+          url += '&components=country:$country';
         } else {
-          url = url + '|' + 'country:' + country;
+          url += '|country:$country';
         }
       }
+    }
+
+    if (widget.latitude != null && widget.longitude != null) {
+      assert(
+        (widget.latitude != 0.0 && widget.longitude != 0.0),
+        'Latitude & Longitude cannot be 0.0',
+      );
+      final lat = widget.latitude;
+      final lng = widget.longitude;
+
+      url += '&location=$lat%2C$lng';
     }
 
     Response response = await _dio.get(url);
