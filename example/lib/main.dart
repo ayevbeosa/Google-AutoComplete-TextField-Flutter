@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+  MyHomePage({Key? key, required this.title}) : super(key: key);
 
   final String title;
 
@@ -79,11 +79,11 @@ class _MyHomePageState extends State<MyHomePage> {
           getPlaceDetailWithLatLng: (Prediction prediction) {
             print("placeDetails" + prediction.lng.toString());
           },
-          itmClick: (Prediction prediction) {
-            controller.text = prediction.description;
+          itemClick: (Prediction prediction) {
+            controller.text = prediction.description!;
 
             controller.selection = TextSelection.fromPosition(
-                TextPosition(offset: prediction.description.length));
+                TextPosition(offset: prediction.description!.length));
           }
           // default 600 ms ,
           ),

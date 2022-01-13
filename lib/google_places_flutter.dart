@@ -1,39 +1,56 @@
 library google_places_flutter;
 
-import 'dart:convert';
-
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_places_flutter/model/place_details.dart';
 import 'package:google_places_flutter/model/prediction.dart';
-
-import 'package:rxdart/subjects.dart';
-import 'package:dio/dio.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:uuid/uuid.dart';
+
+typedef ItemClick = void Function(Prediction prediction);
+typedef GetPlaceDetailsWithLatLng = void Function(Prediction prediction);
 
 class GooglePlaceAutoCompleteTextField extends StatefulWidget {
-  InputDecoration inputDecoration;
-  ItemClick? itmClick;
-  GetPlaceDetailswWithLatLng? getPlaceDetailWithLatLng;
-  bool isLatLngRequired = true;
+  /// [InputDecoration] for the text field.
+  final InputDecoration inputDecoration;
 
-  TextStyle textStyle;
-  String googleAPIKey;
-  int debounceTime = 600;
-  List<String>? countries = [];
-  TextEditingController textEditingController = TextEditingController();
+  /// Passes a [Prediction] when a prediction is clicked.
+  final ItemClick? itemClick;
 
-  GooglePlaceAutoCompleteTextField(
-      {required this.textEditingController,
-      required this.googleAPIKey,
-      this.debounceTime: 600,
-      this.inputDecoration: const InputDecoration(),
-      this.itmClick,
-      this.isLatLngRequired=true,
-      this.textStyle: const TextStyle(),
-      this.countries,
-      this.getPlaceDetailWithLatLng,
-      });
+  /// Passes a [Prediction] with `LatLng` coordinates.
+  final GetPlaceDetailsWithLatLng? getPlaceDetailWithLatLng;
+
+  /// Optional parameter that determines if a [Prediction]
+  /// will contain `LatLng` coordinates.
+  final bool isLatLngRequired;
+
+  /// [TextStyle] of the input text.
+  final TextStyle textStyle;
+
+  /// Google API Key gotten from the Google Cloud Console.
+  /// (Ensure, Places API is enabled before using this key).
+  final String googleAPIKey;
+
+  /// Minimum interval before successive predictions call (default is 600ms).
+  final int debounceTime;
+
+  /// Limit predictions to desired countries.
+  final List<String>? countries;
+
+  /// [TextEditingController] for this TextFormField.
+  final TextEditingController textEditingController;
+
+  GooglePlaceAutoCompleteTextField({
+    required this.textEditingController,
+    required this.googleAPIKey,
+    this.debounceTime = 600,
+    this.inputDecoration: const InputDecoration(),
+    this.itemClick,
+    this.isLatLngRequired = true,
+    this.textStyle: const TextStyle(),
+    this.countries,
+    this.getPlaceDetailWithLatLng,
+  });
 
   @override
   _GooglePlaceAutoCompleteTextFieldState createState() =>
@@ -42,13 +59,25 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
 
 class _GooglePlaceAutoCompleteTextFieldState
     extends State<GooglePlaceAutoCompleteTextField> {
-  final subject = new PublishSubject<String>();
+  final _subject = PublishSubject<String>();
   OverlayEntry? _overlayEntry;
-  List<Prediction> alPredictions = [];
+  List<Prediction> _allPredictions = [];
 
-  TextEditingController controller = TextEditingController();
   final LayerLink _layerLink = LayerLink();
-  bool isSearched = false;
+
+  /// Session token that generates at the beginning of every prediction search
+  /// and regenerates when a prediction has been selected.
+  String sessionToken = Uuid().v4();
+
+  @override
+  void initState() {
+    _subject.stream
+        .distinct()
+        .debounceTime(Duration(milliseconds: widget.debounceTime))
+        .listen(_getLocation);
+
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,129 +87,107 @@ class _GooglePlaceAutoCompleteTextFieldState
         decoration: widget.inputDecoration,
         style: widget.textStyle,
         controller: widget.textEditingController,
-        onChanged: (string) => (subject.add(string)),
+        onChanged: (string) => (_subject.add(string)),
       ),
     );
   }
 
-  getLocation(String text) async {
-    Dio dio = new Dio();
-    String url =
-        "https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$text&key=${widget.googleAPIKey}";
+  Future<void> _getLocation(String text) async {
+    Dio dio = Dio();
+    String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?'
+        'input=$text&radius=500&=&$sessionToken&key=${widget.googleAPIKey}';
 
     if (widget.countries != null) {
-      // in
-
       for (int i = 0; i < widget.countries!.length; i++) {
         String country = widget.countries![i];
 
         if (i == 0) {
-          url = url + "&components=country:$country";
+          url = url + '&components=country:$country';
         } else {
-          url = url + "|" + "country:" + country;
+          url = url + '|' + 'country:' + country;
         }
       }
     }
-
-
 
     Response response = await dio.get(url);
     PlacesAutocompleteResponse subscriptionResponse =
         PlacesAutocompleteResponse.fromJson(response.data);
 
     if (text.length == 0) {
-      alPredictions.clear();
+      _allPredictions.clear();
       this._overlayEntry!.remove();
       return;
     }
 
-    isSearched = false;
     if (subscriptionResponse.predictions!.length > 0) {
-      alPredictions.clear();
-      alPredictions.addAll(subscriptionResponse.predictions!);
+      _allPredictions.clear();
+      _allPredictions.addAll(subscriptionResponse.predictions!);
     }
-
-    //if (this._overlayEntry == null)
 
     this._overlayEntry = null;
     this._overlayEntry = this._createOverlayEntry();
     Overlay.of(context)!.insert(this._overlayEntry!);
-    //   this._overlayEntry.markNeedsBuild();
-  }
-
-  @override
-  void initState() {
-    subject.stream
-        .distinct()
-        .debounceTime(Duration(milliseconds: widget.debounceTime))
-        .listen(textChanged);
-  }
-
-  textChanged(String text) async {
-    getLocation(text);
   }
 
   OverlayEntry? _createOverlayEntry() {
-    if (context != null && context.findRenderObject() != null) {
+    if (context.findRenderObject() != null) {
       RenderBox renderBox = context.findRenderObject() as RenderBox;
       var size = renderBox.size;
       var offset = renderBox.localToGlobal(Offset.zero);
       return OverlayEntry(
-          builder: (context) => Positioned(
-                left: offset.dx,
-                top: size.height + offset.dy,
-                width: size.width,
-                child: CompositedTransformFollower(
-                  showWhenUnlinked: false,
-                  link: this._layerLink,
-                  offset: Offset(0.0, size.height + 5.0),
-                  child: Material(
-                      elevation: 1.0,
-                      child: ListView.builder(
-                        padding: EdgeInsets.zero,
-                        shrinkWrap: true,
-                        itemCount: alPredictions.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          return InkWell(
-                            onTap: () {
-                              if (index < alPredictions.length) {
-                                widget.itmClick!(alPredictions[index]);
-                                if (!widget.isLatLngRequired) return;
+        builder: (context) => Positioned(
+          left: offset.dx,
+          top: size.height + offset.dy,
+          width: size.width,
+          child: CompositedTransformFollower(
+            showWhenUnlinked: false,
+            link: this._layerLink,
+            offset: Offset(0.0, size.height + 5.0),
+            child: Material(
+              elevation: 1.0,
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: _allPredictions.length,
+                itemBuilder: (BuildContext context, int index) {
+                  return InkWell(
+                    onTap: () {
+                      if (index < _allPredictions.length) {
+                        sessionToken = Uuid().v4();
+                        widget.itemClick!(_allPredictions[index]);
+                        if (widget.isLatLngRequired) {
+                          _getPlaceDetailsFromPlaceId(_allPredictions[index]);
+                        }
 
-                                getPlaceDetailsFromPlaceId(
-                                    alPredictions[index]);
-
-                                removeOverlay();
-                              }
-                            },
-                            child: Container(
-                                padding: EdgeInsets.all(10),
-                                child: Text(alPredictions[index].description!)),
-                          );
-                        },
-                      )),
-                ),
-              ));
+                        _removeOverlay();
+                      }
+                    },
+                    child: Container(
+                      padding: EdgeInsets.all(10),
+                      child: Text(_allPredictions[index].description!),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
     }
   }
 
-  removeOverlay() {
-    alPredictions.clear();
+  void _removeOverlay() {
+    _allPredictions.clear();
     this._overlayEntry = this._createOverlayEntry();
-    if (context != null) {
-      Overlay.of(context)!.insert(this._overlayEntry!);
-      this._overlayEntry!.markNeedsBuild();
-    }
+    Overlay.of(context)!.insert(this._overlayEntry!);
+    this._overlayEntry!.markNeedsBuild();
   }
 
-  Future<Response?> getPlaceDetailsFromPlaceId(Prediction prediction) async {
-    //String key = GlobalConfiguration().getString('google_maps_key');
+  Future<Response?> _getPlaceDetailsFromPlaceId(Prediction prediction) async {
+    var url = 'https://maps.googleapis.com/maps/api/place/details/json'
+        '?placeid=${prediction.placeId}&key=${widget.googleAPIKey}';
 
-    var url =
-        "https://maps.googleapis.com/maps/api/place/details/json?placeid=${prediction.placeId}&key=${widget.googleAPIKey}";
-    Response response = await Dio().get(
-      url,
-    );
+    Response response = await Dio().get(url);
 
     PlaceDetails placeDetails = PlaceDetails.fromJson(response.data);
 
@@ -188,21 +195,5 @@ class _GooglePlaceAutoCompleteTextFieldState
     prediction.lng = placeDetails.result!.geometry!.location!.lng.toString();
 
     widget.getPlaceDetailWithLatLng!(prediction);
-
-//    prediction.latLng = new LatLng(
-//        placeDetails.result.geometry.location.lat,
-//        placeDetails.result.geometry.location.lng);
   }
 }
-
-PlacesAutocompleteResponse parseResponse(Map responseBody) {
-  return PlacesAutocompleteResponse.fromJson(responseBody as Map<String, dynamic>);
-}
-
-PlaceDetails parsePlaceDetailMap(Map responseBody) {
-  return PlaceDetails.fromJson(responseBody as Map<String, dynamic>);
-}
-
-typedef ItemClick = void Function(Prediction postalCodeResponse);
-typedef GetPlaceDetailswWithLatLng = void Function(
-    Prediction postalCodeResponse);
