@@ -182,6 +182,7 @@ class _GooglePlaceAutoCompleteTextFieldState
         ),
       );
     }
+    return null;
   }
 
   void _removeOverlay() {
@@ -240,7 +241,7 @@ class _GooglePlaceAutoCompleteTextFieldState
     Overlay.of(context)!.insert(this._overlayEntry!);
   }
 
-  Future<Response?> _getPlaceDetailsFromPlaceId(Prediction prediction) async {
+  Future<void> _getPlaceDetailsFromPlaceId(Prediction prediction) async {
     var url = '$_baseUrl/details/json?placeid=${prediction.placeId}'
         '&sessiontoken=$_sessionToken&key=${widget.googleAPIKey}';
 
