@@ -57,7 +57,7 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
   final double? longitude;
 
   /// Optional parameter to determine finer search
-  final bool strict;
+  // final bool strict;
 
   GooglePlaceAutoCompleteTextField({
     required this.textEditingController,
@@ -72,7 +72,7 @@ class GooglePlaceAutoCompleteTextField extends StatefulWidget {
     this.radius = 500,
     this.latitude,
     this.longitude,
-    this.strict = false,
+    // this.strict = false,
   });
 
   @override
@@ -195,8 +195,7 @@ class _GooglePlaceAutoCompleteTextFieldState
   Future<void> _getLocation(String text) async {
     String url =
         '$_baseUrl/autocomplete/json?input=$text&radius=${widget.radius}'
-        '&sessiontoken=$_sessionToken&strictbounds=${widget.strict}'
-        '&key=${widget.googleAPIKey}';
+        '&sessiontoken=$_sessionToken&key=${widget.googleAPIKey}';
 
     if (widget.countries != null) {
       for (int i = 0; i < widget.countries!.length; i++) {
